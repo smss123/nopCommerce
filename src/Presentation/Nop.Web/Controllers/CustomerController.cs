@@ -714,6 +714,22 @@ namespace Nop.Web.Controllers
                 ModelState.AddModelError("", _localizationService.GetResource("Common.WrongCaptchaMessage"));
             }
 
+            //GDPR
+            if (_gdprSettings.GdprEnabled)
+            {
+                var consents = _gdprService
+                    .GetAllConsents().Where(consent => consent.DisplayDuringRegistration && consent.IsRequired).ToList();
+                foreach (var consent in consents)
+                {
+                    var controlId = $"consent{consent.Id}";
+                    var cbConsent = form[controlId];
+                    if (StringValues.IsNullOrEmpty(cbConsent) || !cbConsent.ToString().Equals("on"))
+                    {
+                        ModelState.AddModelError("", consent.RequiredMessage);
+                    }
+                }
+            }
+
             if (ModelState.IsValid)
             {
                 if (_customerSettings.UsernamesEnabled && model.Username != null)
@@ -1094,6 +1110,22 @@ namespace Nop.Web.Controllers
             foreach (var error in customerAttributeWarnings)
             {
                 ModelState.AddModelError("", error);
+            }
+
+            //GDPR
+            if (_gdprSettings.GdprEnabled)
+            {
+                var consents = _gdprService
+                    .GetAllConsents().Where(consent => consent.DisplayOnCustomerInfoPage && consent.IsRequired).ToList();
+                foreach (var consent in consents)
+                {
+                    var controlId = $"consent{consent.Id}";
+                    var cbConsent = form[controlId];
+                    if (StringValues.IsNullOrEmpty(cbConsent) || !cbConsent.ToString().Equals("on"))
+                    {
+                        ModelState.AddModelError("", consent.RequiredMessage);
+                    }
+                }
             }
 
             try
