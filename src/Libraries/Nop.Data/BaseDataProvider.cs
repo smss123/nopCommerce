@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using LinqToDB;
@@ -9,15 +10,16 @@ using LinqToDB.DataProvider;
 using LinqToDB.Mapping;
 using LinqToDB.Tools;
 using Nop.Core;
+using Nop.Core.Domain;
 using Nop.Core.Infrastructure;
 using Nop.Data.Mapping;
+using StackExchange.Profiling;
+using StackExchange.Profiling.Data;
 
 namespace Nop.Data
 {
     public abstract class BaseDataProvider
     {
-        public abstract IDbConnection CreateDbConnection(string connectionString = null);
-
         #region Utils
 
         private void UpdateParameterValue(DataConnection dataConnection, DataParameter parameter)
@@ -49,6 +51,13 @@ namespace Nop.Data
         }
 
         /// <summary>
+        /// Gets a connection to the database for a current data provider
+        /// </summary>
+        /// <param name="connectionString">Connection string</param>
+        /// <returns>Connection to a database</returns>
+        protected abstract IDbConnection GetInternalDbConnection(string connectionString);
+
+        /// <summary>
         /// Creates the database connection
         /// </summary>
         protected virtual DataConnection CreateDataConnection()
@@ -76,6 +85,16 @@ namespace Nop.Data
 
         #region Methods
 
+        public virtual IDbConnection CreateDbConnection(string connectionString = null) 
+        {
+            var dbConnection = GetInternalDbConnection(!string.IsNullOrEmpty(connectionString) ? connectionString : CurrentConnectionString);
+
+            if(IsProfilingEnabled())
+                return new ProfiledDbConnection((DbConnection)dbConnection, MiniProfiler.Current);
+
+            return dbConnection;
+        }
+
         /// <summary>
         /// Returns mapped entity descriptor.
         /// </summary>
@@ -84,6 +103,20 @@ namespace Nop.Data
         public EntityDescriptor GetEntityDescriptor<TEntity>() where TEntity : BaseEntity
         {
             return AdditionalSchema?.GetEntityDescriptor(typeof(TEntity));
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether mini profiler enabled
+        /// </summary>
+        /// <returns>Returns true if profiling is enabled.</returns>
+        public virtual bool IsProfilingEnabled()
+        {
+            if(!DataSettingsManager.DatabaseIsInstalled)
+                return false;
+
+            var storeSettings = EngineContext.Current.Resolve<StoreInformationSettings>();
+            
+            return storeSettings.DisplayMiniProfilerInPublicStore || storeSettings.DisplayMiniProfilerForAdminOnly;
         }
 
         /// <summary>
